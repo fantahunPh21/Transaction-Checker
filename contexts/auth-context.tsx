@@ -34,7 +34,7 @@ interface AuthContextType {
   logout: () => void
   isLoading: boolean
   checkTokenExpiration: () => boolean
-  isAuthenticated: () => boolean
+  isAuthenticated: boolean
   hasRole: (roles: string | string[]) => boolean
 }
 
@@ -233,7 +233,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   /**
-   * Check if user has specified role(s)
    * @param roles - Single role string or array of role strings
    * @returns Boolean indicating if user has any of the specified roles
    */
