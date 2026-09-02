@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { type VerificationData, type VerificationResult, BANK_CONFIGS } from "@/lib/verification"
 import { useToast } from "@/hooks/use-toast"
 
@@ -10,13 +10,7 @@ export function useVerification() {
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<VerificationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
   const { toast } = useToast()
-
-  // Prevent server-side execution
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const authHeaders = (): HeadersInit => {
     if (typeof window === "undefined") return { "Content-Type": "application/json" }
@@ -107,21 +101,6 @@ export function useVerification() {
     const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`
     return `${base}${normalized}`
   }, [])
-
-  // Return safe values during SSR
-  if (!mounted) {
-    return {
-      isLoading: false,
-      result: null,
-      error: null,
-      verifyTransaction: async () => ({ isValid: false } as VerificationResult),
-      clearResult: () => {},
-      validateInvoiceNumber: () => false,
-      getBankConfig: () => undefined,
-      getAllBanks: () => [],
-      getReceiptUrl: () => "",
-    }
-  }
 
   return {
     isLoading,

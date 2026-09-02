@@ -13,16 +13,18 @@ export interface VerificationData {
   notes?: string
 }
 
+export interface TransactionDetails {
+  transactionId: string
+  amount: string
+  date: string
+  recipient: string
+  status: string
+  bank: string
+}
+
 export interface VerificationResult {
   isValid: boolean
-  transactionDetails?: {
-    transactionId: string
-    amount: string
-    date: string
-    recipient: string
-    status: string
-    bank: string
-  }
+  transactionDetails?: TransactionDetails
   error?: string
 }
 
@@ -30,7 +32,7 @@ export const BANK_CONFIGS: Record<string, BankConfig> = {
   telebirr: {
     name: "Telebirr",
     baseUrl: "https://transactioninfo.ethiotelecom.et/receipt/",
-    pattern: /^[A-Z0-9]{8,12}$/,
+    pattern: /^[A-Z0-9]{8,15}$/,
     color: "#FF6B35",
   },
   cbe: {
@@ -65,6 +67,8 @@ export const BANK_CONFIGS: Record<string, BankConfig> = {
   },
 }
 
+const REQUEST_TIMEOUT_MS = 12000
+
 export class VerificationService {
   private static instance: VerificationService
 
@@ -90,7 +94,6 @@ export class VerificationService {
         }
       }
 
-      // Fetch the bank-specific receipt link and parse the result
       return await this.fetchBankTransaction(data, config)
     } catch (error) {
       console.error("Verification error:", error)
@@ -106,7 +109,6 @@ export class VerificationService {
     const config = BANK_CONFIGS[bank]
     if (!config) return ""
     const normalized = invoiceNumber.toUpperCase()
-    // Some bank URLs append a trailing slash, others don't
     const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`
     return `${base}${normalized}`
   }
@@ -118,33 +120,13 @@ export class VerificationService {
     const url = this.getReceiptUrl(data.bank, data.invoiceNumber)
 
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        // Credentials must be omitted for cross-origin bank endpoints
-        cache: "no-store",
-        headers: {
-          "User-Agent": "FinanceApp/1.0",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8,application/json",
-        },
-      })
+      const body = await this.fetchWithTimeout(url, REQUEST_TIMEOUT_MS)
 
-      if (!response.ok) {
-        return {
-          isValid: false,
-          error: "Transaction not found or invalid",
-        }
+      if (data.bank === "telebirr") {
+        return this.parseTelebirrReceipt(body, data, config)
       }
 
-      const contentType = response.headers.get("content-type") || ""
-      let body: string
-
-      if (contentType.includes("application/json")) {
-        const json = await response.json()
-        return this.parseJsonResponse(json, data, config)
-      } else {
-        body = await response.text()
-        return this.parseHtmlResponse(body, data, config)
-      }
+      return this.parseGenericHtml(body, data, config)
     } catch (error) {
       console.error(`${config.name} verification error:`, error)
       return {
@@ -154,50 +136,151 @@ export class VerificationService {
     }
   }
 
-  private parseJsonResponse(
-    json: unknown,
+  /**
+   * Fetch a URL with a hard timeout and TLS fallback.
+   *
+   * The Telebirr receipt site serves a self-signed / chained leaf certificate
+   * that fails strict Node verification (the official `telebirr-receipt`
+   * integration disables TLS verification for the same reason). We retry once
+   * with `rejectUnauthorized: false` to work around it.
+   *
+   * A timeout ensures the API returns instead of hanging when a bank server is
+   * unreachable (e.g. regional IP blocking for out-of-Ethiopia hosts).
+   */
+  private fetchWithTimeout(url: string, timeoutMs: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const isHttps = url.startsWith("https:")
+      const mod = isHttps ? require("https") : require("http")
+
+      const attempt = (rejectUnauthorized: boolean) => {
+        const req = mod.request(
+          url,
+          {
+            method: "GET",
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+              Accept:
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8,application/json",
+            },
+            ...(isHttps ? { rejectUnauthorized } : {}),
+          },
+          (res: {
+            statusCode?: number
+            headers?: Record<string, unknown>
+            on: (event: string, cb: (chunk: Buffer) => void) => void
+          }) => {
+            clearTimeout(timer)
+            const location = res.headers && res.headers.location
+            if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && location) {
+              resolve(this.fetchWithTimeout(String(location), timeoutMs))
+              return
+            }
+
+            const chunks: Buffer[] = []
+            res.on("data", (c: Buffer) => chunks.push(c))
+            res.on("end", () => {
+              resolve(Buffer.concat(chunks).toString("utf-8"))
+            })
+          }
+        )
+
+        const timer = setTimeout(() => {
+          req.destroy(new Error("Request timed out"))
+        }, timeoutMs)
+
+        req.on("error", (err: Error & { code?: string }) => {
+          clearTimeout(timer)
+          if (rejectUnauthorized && err.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") {
+            attempt(false)
+            return
+          }
+          reject(err)
+        })
+
+        req.end()
+      }
+
+      attempt(true)
+    })
+  }
+
+  /**
+   * Parse a Telebirr receipt.
+   *
+   * The receipt is an HTML table of rows. Most rows carry a label (Amharic/
+   * English mixed, e.g. "የክፍያው ሁኔታ/transaction status") in the first cell
+   * and the value in the following cell(s). A separate "invoice details" table
+   * lists Invoice No. / Payment date / Settled Amount as columns.
+   */
+  private parseTelebirrReceipt(
+    html: string,
     data: VerificationData,
     config: BankConfig
   ): VerificationResult {
-    const record = (json && typeof json === "object" ? json : {}) as Record<string, unknown>
+    const rows = this.extractTableRows(html)
+    // Normalize each row's label to a compact lowercase form for matching.
+    const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "")
 
-    // Accept common shapes: { isValid/isValidated/status } or { data: {...} }
-    const status = String(record.status ?? record.transactionStatus ?? "").toLowerCase()
-    const isValid =
-      record.isValid === true ||
-      record.isValidated === true ||
-      status === "completed" ||
-      status === "confirmed" ||
-      status === "success"
+    const byLabel = (token: string): string => {
+      const t = norm(token)
+      for (const row of rows) {
+        if (norm(row[0]).includes(t)) return (row[1] || "").trim()
+      }
+      return ""
+    }
 
-    if (isValid) {
-      return {
-        isValid: true,
-        transactionDetails: {
-          transactionId:
-            String(record.transactionId ?? record.referenceId ?? data.invoiceNumber),
-          amount: String(record.amount ?? record.amountPaid ?? data.amount ?? "N/A"),
-          date: String(record.date ?? record.transactionDate ?? "N/A"),
-          recipient: String(record.recipient ?? record.recipientPhone ?? data.recipientPhone ?? "N/A"),
-          status: "Completed",
-          bank: config.name,
-        },
+    const status = byLabel("transactionstatus")
+    const creditedParty = byLabel("creditedpartyname")
+    const payerName = byLabel("payername")
+
+    // Invoice details table: columns are
+    // [Invoice No., Payment date, Settled Amount] with a header row above them.
+    let invoiceNo = ""
+    let paymentDate = ""
+    let settledAmount = ""
+    for (let r = 0; r < rows.length; r++) {
+      if (norm(rows[r][0]).includes("invoiceno")) {
+        const dataRow = rows[r + 1]
+        if (dataRow && dataRow.length >= 3) {
+          invoiceNo = (dataRow[0] || "").trim()
+          paymentDate = (dataRow[1] || "").trim()
+          settledAmount = (dataRow[2] || "").trim()
+        }
+        break
       }
     }
 
+    // A missing status usually means the receipt number does not exist
+    // (the site returns its "not found" page instead of the table).
+    if (!status || /not.found|invalid|error/i.test(status)) {
+      return { isValid: false, error: "Transaction not found" }
+    }
+
+    const isCompleted = /completed|success/i.test(status)
+    if (!isCompleted) {
+      return { isValid: false, error: `Transaction status: ${status}` }
+    }
+
     return {
-      isValid: false,
-      error: record.message ? String(record.message) : "Transaction not found",
+      isValid: true,
+      transactionDetails: {
+        transactionId: invoiceNo || byLabel("receiptno") || data.invoiceNumber,
+        amount: settledAmount || byLabel("totalamountpaid") || data.amount || "N/A",
+        date: paymentDate || byLabel("paymentdate") || "N/A",
+        recipient: creditedParty || payerName || data.recipientPhone || "N/A",
+        status: "Completed",
+        bank: config.name,
+      },
     }
   }
 
-  private parseHtmlResponse(
+  private parseGenericHtml(
     html: string,
     data: VerificationData,
     config: BankConfig
   ): VerificationResult {
     try {
-      // Basic HTML scan for transaction/receipt markers
       const isValid =
         html.includes("Transaction Details") ||
         html.includes("Receipt") ||
@@ -209,11 +292,10 @@ export class VerificationService {
         return {
           isValid: true,
           transactionDetails: {
-            transactionId:
-              this.extractTransactionId(html) || data.invoiceNumber,
-            amount: this.extractAmount(html) || data.amount || "N/A",
-            date: this.extractDate(html) || "N/A",
-            recipient: this.extractRecipient(html) || data.recipientPhone || "N/A",
+            transactionId: this.extractGenericTransactionId(html) || data.invoiceNumber,
+            amount: this.extractGenericAmount(html) || data.amount || "N/A",
+            date: this.extractGenericDate(html) || "N/A",
+            recipient: this.extractGenericRecipient(html) || data.recipientPhone || "N/A",
             status: "Completed",
             bank: config.name,
           },
@@ -232,29 +314,51 @@ export class VerificationService {
     }
   }
 
-  private extractTransactionId(html: string): string {
+  /**
+   * Extract table rows as arrays of cell text. Each `<tr>` becomes an array of
+   * its `<td>` text values, preserving the label/value relationship.
+   */
+  private extractTableRows(html: string): string[][] {
+    const rows: string[][] = []
+    const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+    let tr: RegExpExecArray | null
+    while ((tr = trRe.exec(html)) !== null) {
+      const rowHtml = tr[1]
+      const cells: string[] = []
+      const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi
+      let td: RegExpExecArray | null
+      while ((td = tdRe.exec(rowHtml)) !== null) {
+        cells.push(this.stripTags(td[1]).replace(/\s+/g, " ").trim())
+      }
+      if (cells.length) rows.push(cells)
+    }
+    return rows
+  }
+
+  private stripTags(html: string): string {
+    return html.replace(/<[^>]*>/g, " ")
+  }
+
+  private extractGenericTransactionId(html: string): string {
     const match =
       html.match(/Transaction(?:\s+ID)?[:\s]*([A-Z0-9_-]+)/i) ||
       html.match(/Receipt(?:\s+No\.?| Number)?[:\s]*([A-Z0-9_-]+)/i)
     return match ? match[1] : ""
   }
 
-  private extractAmount(html: string): string {
-    // Implement amount extraction logic
-    const amountMatch = html.match(/Amount[:\s]*([0-9,]+\.?[0-9]*)/i)
-    return amountMatch ? amountMatch[1] : "N/A"
+  private extractGenericAmount(html: string): string {
+    const match = html.match(/Amount[:\s]*([0-9,]+\.?[0-9]*)/i)
+    return match ? match[1] : "N/A"
   }
 
-  private extractDate(html: string): string {
-    // Implement date extraction logic
-    const dateMatch = html.match(/Date[:\s]*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4})/i)
-    return dateMatch ? dateMatch[1] : "N/A"
+  private extractGenericDate(html: string): string {
+    const match = html.match(/Date[:\s]*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4})/i)
+    return match ? match[1] : "N/A"
   }
 
-  private extractRecipient(html: string): string {
-    // Implement recipient extraction logic
-    const recipientMatch = html.match(/Recipient[:\s]*([^<>\n]+)/i)
-    return recipientMatch ? recipientMatch[1].trim() : "N/A"
+  private extractGenericRecipient(html: string): string {
+    const match = html.match(/Recipient[:\s]*([^<>\n]+)/i)
+    return match ? match[1].trim() : "N/A"
   }
 
   validateInvoiceNumber(bank: string, invoiceNumber: string): boolean {

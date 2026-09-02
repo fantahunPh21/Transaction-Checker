@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { verificationService } from "@/lib/verification"
-
-async function getAuthToken(request: NextRequest): Promise<string | null> {
-  const cookieStore = await cookies()
-  const authCookie = cookieStore.get("authToken")?.value
-
-  const incomingHeader = request.headers.get("Authorization")
-
-  return incomingHeader?.replace("Bearer ", "") || authCookie || null
-}
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const token = await getAuthToken(request)
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await request.json()
     const { bank, invoiceNumber, amount, recipientPhone, notes } = body
 
@@ -58,12 +42,6 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const token = await getAuthToken(request)
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     // Return available banks for the frontend
     const banks = verificationService.getAllBanks()
     return NextResponse.json({ banks })
