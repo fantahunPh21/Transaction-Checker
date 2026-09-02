@@ -1,4 +1,5 @@
 export interface BankConfig {
+  key: string
   name: string
   baseUrl: string
   pattern: RegExp
@@ -17,6 +18,7 @@ export interface TransactionDetails {
   transactionId: string
   amount: string
   date: string
+  sender: string
   recipient: string
   status: string
   bank: string
@@ -30,36 +32,42 @@ export interface VerificationResult {
 
 export const BANK_CONFIGS: Record<string, BankConfig> = {
   telebirr: {
+    key: "telebirr",
     name: "Telebirr",
     baseUrl: "https://transactioninfo.ethiotelecom.et/receipt/",
     pattern: /^[A-Z0-9]{8,15}$/,
     color: "#FF6B35",
   },
   cbe: {
+    key: "cbe",
     name: "Commercial Bank of Ethiopia (CBE)",
-    baseUrl: "https://cbe.com.et/transaction/",
-    pattern: /^CBE[A-Z0-9]{8,15}$/,
+    baseUrl: "https://apps.cbe.com.et:100/BranchReceipt/",
+    pattern: /^[A-Z0-9]+$/,
     color: "#1E88E5",
   },
   boa: {
+    key: "boa",
     name: "Bank of Abyssinia (BOA)",
-    baseUrl: "https://boa.com.et/verify/",
-    pattern: /^BOA[A-Z0-9]{8,15}$/,
+    baseUrl: "https://cs.bankofabyssinia.com/slip/?trx=",
+    pattern: /^[A-Z0-9]+$/,
     color: "#4CAF50",
   },
   awash: {
+    key: "awash",
     name: "Awash Bank",
     baseUrl: "https://awashbank.com/receipt/",
     color: "#9C27B0",
     pattern: /^AWB[A-Z0-9]{8,15}$/,
   },
   abay: {
+    key: "abay",
     name: "Abay Bank",
     baseUrl: "https://abaybank.com.et/transaction/",
     color: "#FF9800",
     pattern: /^ABY[A-Z0-9]{8,15}$/,
   },
   addis: {
+    key: "addis",
     name: "Addis International Bank",
     baseUrl: "https://addisbank.com/verify/",
     color: "#795548",
@@ -104,20 +112,32 @@ export class VerificationService {
     }
   }
 
-  /** Build the bank-specific receipt URL for a given invoice number. */
+  /** Build the bank-specific data/receipt URL for a given invoice number. */
   getReceiptUrl(bank: string, invoiceNumber: string): string {
     const config = BANK_CONFIGS[bank]
     if (!config) return ""
-    const normalized = invoiceNumber.toUpperCase()
-    const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`
-    return `${base}${normalized}`
+    const normalized = invoiceNumber.trim().toUpperCase()
+    const base = config.baseUrl
+    // Query-string style URLs (e.g. ".../slip/?trx=") append the value directly.
+    if (base.includes("?")) return `${base}${normalized}`
+    const sep = base.endsWith("/") ? "" : "/"
+    return `${base}${sep}${normalized}`
+  }
+
+  /** Build the bank-specific data/API URL used for machine verification. */
+  private getBankDataUrl(bank: string, invoiceNumber: string): string {
+    const normalized = invoiceNumber.trim().toUpperCase()
+    if (bank === "boa") {
+      return `https://cs.bankofabyssinia.com/api/onlineSlip/getDetails/?id=${normalized}`
+    }
+    return this.getReceiptUrl(bank, invoiceNumber)
   }
 
   private async fetchBankTransaction(
     data: VerificationData,
     config: BankConfig
   ): Promise<VerificationResult> {
-    const url = this.getReceiptUrl(data.bank, data.invoiceNumber)
+    const url = this.getBankDataUrl(data.bank, data.invoiceNumber)
 
     try {
       const body = await this.fetchWithTimeout(url, REQUEST_TIMEOUT_MS)
@@ -126,12 +146,18 @@ export class VerificationService {
         return this.parseTelebirrReceipt(body, data, config)
       }
 
+      if (data.bank === "boa") {
+        return this.parseBoaReceipt(body, data, config)
+      }
+
       return this.parseGenericHtml(body, data, config)
     } catch (error) {
       console.error(`${config.name} verification error:`, error)
       return {
         isValid: false,
-        error: "Network error or service unavailable",
+        error: `Network error or service unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       }
     }
   }
@@ -222,10 +248,21 @@ export class VerificationService {
     // Normalize each row's label to a compact lowercase form for matching.
     const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "")
 
+    // Some Telebirr rows omit the closing `</td>` on the label cell, so the
+    // label and its value collapse into a single cell (e.g.
+    // "...transaction statusCompleted"). When `row[1]` is absent, fall back to
+    // reading the value that trails the matched label inside that one cell.
     const byLabel = (token: string): string => {
       const t = norm(token)
       for (const row of rows) {
-        if (norm(row[0]).includes(t)) return (row[1] || "").trim()
+        const label = norm(row[0])
+        if (!label.includes(t)) continue
+        if (row.length > 1) return (row[1] || "").trim()
+        // Map the token back onto the raw cell (spaces optional between
+        // characters) to capture the trailing value at the correct offset.
+        const esc = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split("").join("\\s*")
+        const m = (row[0] || "").match(new RegExp(esc, "i"))
+        return m ? (row[0] || "").slice(m.index! + m[0].length).trim() : ""
       }
       return ""
     }
@@ -268,10 +305,74 @@ export class VerificationService {
         transactionId: invoiceNo || byLabel("receiptno") || data.invoiceNumber,
         amount: settledAmount || byLabel("totalamountpaid") || data.amount || "N/A",
         date: paymentDate || byLabel("paymentdate") || "N/A",
+        sender: payerName || "N/A",
         recipient: creditedParty || payerName || data.recipientPhone || "N/A",
         status: "Completed",
         bank: config.name,
       },
+    }
+  }
+
+  /**
+   * Parse a BOA (Bank of Abyssinia) online-slip API response.
+   *
+   * BOA's slip page is a client-side React SPA, so fetching the receipt HTML
+   * returns an empty shell. The real data comes from a JSON endpoint:
+   *
+   *   https://cs.bankofabyssinia.com/api/onlineSlip/getDetails/?id=<trx>
+   *
+   * The response shape is `{ header: {...}, body: [ { ... } ] }` where `body[0]`
+   * holds the slip fields as object keys:
+   *
+   *   Source Account Name / Receiver's Name / Total Amount including VAT /
+   *   Transaction Reference / Transaction Date / currency / Transaction Type /
+   *   Narrative / Transferred Amount / Service Charge / VAT (15%) ...
+   */
+  private parseBoaReceipt(
+    raw: string,
+    data: VerificationData,
+    config: BankConfig
+  ): VerificationResult {
+    try {
+      const json = JSON.parse(raw)
+      const row = Array.isArray(json?.body) ? json.body[0] : json?.body
+      if (!row || typeof row !== "object") {
+        return { isValid: false, error: "Transaction not found" }
+      }
+
+      const val = (k: string) =>
+        row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : ""
+
+      const reference = val("Transaction Reference")
+      const totalAmount = val("Total Amount including VAT")
+      const transferred = val("Transferred Amount")
+      const currency = val("currency") || "ETB"
+      const amount = totalAmount || transferred
+
+      // A valid slip always includes the reference and an amount.
+      if (!reference && !amount) {
+        return { isValid: false, error: "Transaction not found" }
+      }
+
+      return {
+        isValid: true,
+        transactionDetails: {
+          transactionId: reference || data.invoiceNumber,
+          amount: amount ? `${currency} ${amount}` : data.amount || "N/A",
+          date: val("Transaction Date") || "N/A",
+          sender: val("Source Account Name") || val("Payer's Name") || "N/A",
+          recipient:
+            val("Receiver's Name") ||
+            val("Source Account Name") ||
+            data.recipientPhone ||
+            "N/A",
+          status: "Completed",
+          bank: config.name,
+        },
+      }
+    } catch (error) {
+      console.error("[BOA] JSON parse failed:", error)
+      return { isValid: false, error: "Transaction not found" }
     }
   }
 
@@ -295,6 +396,7 @@ export class VerificationService {
             transactionId: this.extractGenericTransactionId(html) || data.invoiceNumber,
             amount: this.extractGenericAmount(html) || data.amount || "N/A",
             date: this.extractGenericDate(html) || "N/A",
+            sender: this.extractGenericSender(html) || data.recipientPhone || "N/A",
             recipient: this.extractGenericRecipient(html) || data.recipientPhone || "N/A",
             status: "Completed",
             bank: config.name,
@@ -358,6 +460,13 @@ export class VerificationService {
 
   private extractGenericRecipient(html: string): string {
     const match = html.match(/Recipient[:\s]*([^<>\n]+)/i)
+    return match ? match[1].trim() : "N/A"
+  }
+
+  private extractGenericSender(html: string): string {
+    const match =
+      html.match(/Sender[:\s]*([^<>\n]+)/i) ||
+      html.match(/Paid(?:\s+By| From)[:\s]*([^<>\n]+)/i)
     return match ? match[1].trim() : "N/A"
   }
 

@@ -97,9 +97,12 @@ export function useVerification() {
   const getReceiptUrl = useCallback((bank: string, invoiceNumber: string) => {
     const config = BANK_CONFIGS[bank]
     if (!config) return ""
-    const normalized = invoiceNumber.toUpperCase()
-    const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`
-    return `${base}${normalized}`
+    const normalized = invoiceNumber.trim().toUpperCase()
+    const base = config.baseUrl
+    // Query-string style URLs (e.g. ".../slip/?trx=") append the value directly.
+    if (base.includes("?")) return `${base}${normalized}`
+    const sep = base.endsWith("/") ? "" : "/"
+    return `${base}${sep}${normalized}`
   }, [])
 
   return {

@@ -123,7 +123,7 @@ export function TransactionVerifier({ onVerificationComplete, className }: Trans
               </SelectTrigger>
               <SelectContent className="bg-white border border-gray-200 shadow-xl">
                 {banks.map((bank) => {
-                  const value = bank.name.toLowerCase().replace(/\s+/g, '-')
+                  const value = bank.key
                   return (
                     <SelectItem key={value} value={value}>
                       <div className="flex items-center gap-3">
@@ -268,6 +268,10 @@ export function TransactionVerifier({ onVerificationComplete, className }: Trans
                   <div className="bg-white p-4">
                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date</span>
                     <p className="mt-1 text-sm font-semibold text-gray-900">{result.transactionDetails.date}</p>
+                  </div>
+                  <div className="bg-white p-4">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sender</span>
+                    <p className="mt-1 truncate text-sm font-semibold text-gray-900">{result.transactionDetails.sender}</p>
                   </div>
                   <div className="bg-white p-4">
                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recipient</span>
