@@ -15,7 +15,7 @@ import {
 import { useSelector, useDispatch } from "react-redux"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
-import type { RootState } from "../store/store"
+import type { RootState, AppDispatch } from "../store/store"
 import { fetchTransactionHistory, clearHistory } from "../store/slices/historySlice"
 
 interface Transaction {
@@ -30,7 +30,7 @@ interface Transaction {
 
 export default function HistoryScreen() {
   const navigation = useNavigation()
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const { transactions, isLoading } = useSelector((state: RootState) => state.history)
 
   const [searchQuery, setSearchQuery] = useState("")
@@ -117,7 +117,7 @@ export default function HistoryScreen() {
       <FlatList
         data={filteredTransactions}
         renderItem={renderTransaction}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: Transaction) => item.id}
         contentContainerStyle={styles.listContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={

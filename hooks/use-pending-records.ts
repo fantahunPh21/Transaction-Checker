@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/api"
+import type { PaymentRecord } from "@/lib/types"
 
 export function usePendingRecords() {
-  const [pendingRecords, setPendingRecords] = useState([])
+  const [pendingRecords, setPendingRecords] = useState<PaymentRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -19,10 +20,10 @@ export function usePendingRecords() {
         const result = await api.get("payment-records/pending")
 
         // Set the records from the content array
-        setPendingRecords(result.content)
+        setPendingRecords(result.content ?? [])
       } catch (err) {
         console.error("Error fetching pending payment records:", err)
-        setError(err.message)
+        setError(err instanceof Error ? err.message : "Failed to load pending payment records")
         toast({
           title: "Error",
           description: "Failed to load pending payment records",

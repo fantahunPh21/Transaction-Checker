@@ -16,7 +16,25 @@ import { X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { rolesRecord } from "@/hooks/roles-record"
 
-export function AssignRoleModal({ open, onOpenChange, user, onAssignRole, onRemoveRole }) {
+interface AssignRoleModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onAssignRole: (userId: number | undefined, roleId: string) => Promise<void>
+  onRemoveRole: (userId: number | undefined, roleId: number | undefined) => Promise<void>
+  user: {
+    id?: number
+    firstName?: string
+    lastName?: string
+    roles?: Array<{
+      id?: number
+      roleId?: number
+      name?: string
+      roleName?: string
+    }>
+  } | null
+}
+
+export function AssignRoleModal({ open, onOpenChange, user, onAssignRole, onRemoveRole }: AssignRoleModalProps) {
   const [selectedRole, setSelectedRole] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
@@ -41,7 +59,7 @@ export function AssignRoleModal({ open, onOpenChange, user, onAssignRole, onRemo
 
     try {
       setIsSubmitting(true)
-      await onAssignRole(user.id, selectedRole)
+      await onAssignRole(user?.id, selectedRole)
 
       toast({
         title: "SUCCESS",
@@ -62,9 +80,9 @@ export function AssignRoleModal({ open, onOpenChange, user, onAssignRole, onRemo
     }
   }
 
-  const handleRemoveRole = async (roleId) => {
+  const handleRemoveRole = async (roleId: number | undefined) => {
     try {
-      await onRemoveRole(user.id, roleId)
+      await onRemoveRole(user?.id, roleId)
 
       toast({
         title: "SUCCESS",
@@ -100,7 +118,7 @@ export function AssignRoleModal({ open, onOpenChange, user, onAssignRole, onRemo
           <div>
             <h3 className="text-sm font-medium mb-2">Current Roles</h3>
             <div className="flex flex-wrap gap-2">
-              {user?.roles?.length > 0 ? (
+              {user?.roles && user.roles.length > 0 ? (
                 user.roles.map((role) => (
                   <Badge key={role.id || role.roleId} variant="outline" className="flex items-center gap-1 py-1">
                     {role.name || role.roleName}
@@ -139,7 +157,8 @@ export function AssignRoleModal({ open, onOpenChange, user, onAssignRole, onRemo
                   ) : (
                     availableRoles.map((role) => (
                       <SelectItem key={role.roleId} value={String(role.roleId)}>
-                        {role.roleName.charAt(0).toUpperCase() + role.roleName.slice(1).toLowerCase()}
+                        {(role.roleName ?? role.name ?? "").charAt(0).toUpperCase() +
+                          (role.roleName ?? role.name ?? "").slice(1).toLowerCase()}
                       </SelectItem>
                     ))
                   )}

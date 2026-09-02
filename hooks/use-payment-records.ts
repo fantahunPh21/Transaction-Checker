@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
+import type { PaymentRecord } from "@/lib/types"
 
 export function usePaymentRecords(initialPage = 0, pageSize = 10) {
-  const [records, setRecords] = useState([])
+  const [records, setRecords] = useState<PaymentRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState({
     currentPage: initialPage,
     totalPages: 0,
@@ -45,7 +46,7 @@ export function usePaymentRecords(initialPage = 0, pageSize = 10) {
       const result = await response.json()
 
       // Set the records from the content array
-      setRecords(result.content)
+      setRecords(result.content ?? [])
 
       // Update pagination state with data from the API
       setPagination({
@@ -56,7 +57,7 @@ export function usePaymentRecords(initialPage = 0, pageSize = 10) {
       })
     } catch (err) {
       console.error("Error fetching payment records:", err)
-      setError(err.message)
+      setError(err instanceof Error ? err.message : "Failed to fetch payment records")
       toast({
         title: "Error",
         description: "Failed to load payment records",
@@ -68,14 +69,14 @@ export function usePaymentRecords(initialPage = 0, pageSize = 10) {
   }
 
   // Function to change the page
-  const goToPage = (page) => {
+  const goToPage = (page: number) => {
     if (page >= 0 && page < pagination.totalPages) {
       fetchData(page, pagination.pageSize)
     }
   }
 
   // Function to change the page size
-  const changePageSize = (newSize) => {
+  const changePageSize = (newSize: number) => {
     fetchData(0, newSize) // Reset to first page when changing page size
   }
 

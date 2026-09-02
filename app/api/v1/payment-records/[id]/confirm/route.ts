@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const id = params.id
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
 
   try {
     // Replace with your actual Django API URL

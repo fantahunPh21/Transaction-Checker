@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { LineChart, PieChart } from "react-native-chart-kit"
 import type { RootState } from "../store/store"
 import { fetchDashboardData } from "../store/slices/dashboardSlice"
+import type { AppDispatch } from "../store/store"
 import { BankCard } from "../components/BankCard"
 import { QuickActionButton } from "../components/QuickActionButton"
 import { RecentTransactionItem } from "../components/RecentTransactionItem"
@@ -25,7 +26,7 @@ const { width } = Dimensions.get("window")
 
 export default function HomeScreen() {
   const navigation = useNavigation()
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const { user } = useSelector((state: RootState) => state.auth)
   const { stats, recentTransactions, isLoading } = useSelector((state: RootState) => state.dashboard)
   const [refreshing, setRefreshing] = useState(false)

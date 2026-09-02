@@ -1,5 +1,21 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
 
+interface HistoryTransaction {
+  id: string
+  bank: string
+  invoiceNumber: string
+  amount: string
+  date: string
+  status: string
+  recipient?: string
+}
+
+interface HistoryState {
+  transactions: HistoryTransaction[]
+  isLoading: boolean
+  error: string | null
+}
+
 export const fetchTransactionHistory = createAsyncThunk("history/fetchHistory", async () => {
   // Simulate API call
   await new Promise((resolve) => setTimeout(resolve, 500))
@@ -33,9 +49,9 @@ export const clearHistory = createAsyncThunk("history/clearHistory", async () =>
 const historySlice = createSlice({
   name: "history",
   initialState: {
-    transactions: [],
+    transactions: [] as HistoryTransaction[],
     isLoading: false,
-    error: null,
+    error: null as string | null,
   },
   reducers: {},
   extraReducers: (builder) => {

@@ -34,7 +34,8 @@ export function TransactionVerifier({ onVerificationComplete, className }: Trans
     clearResult, 
     validateInvoiceNumber, 
     getBankConfig, 
-    getAllBanks 
+    getAllBanks,
+    getReceiptUrl 
   } = useVerification()
 
   // Prevent hydration mismatch by only rendering after mount
@@ -320,6 +321,20 @@ export function TransactionVerifier({ onVerificationComplete, className }: Trans
               ) : (
                 <div className="p-4 bg-red-50 rounded-xl border border-red-200">
                   <p className="text-red-700 font-medium text-center">{result.error}</p>
+                </div>
+              )}
+
+              {invoiceNumber && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <a
+                    href={getReceiptUrl(selectedBank, invoiceNumber)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    View {getBankConfig(selectedBank)?.name || "bank"} receipt
+                  </a>
                 </div>
               )}
             </div>

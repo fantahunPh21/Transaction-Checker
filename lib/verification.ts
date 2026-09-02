@@ -90,13 +90,8 @@ export class VerificationService {
         }
       }
 
-      // For Telebirr (real endpoint)
-      if (data.bank === "telebirr") {
-        return await this.verifyTelebirrTransaction(data)
-      }
-
-      // For other banks, you can implement your backend API calls here
-      return await this.verifyViaBackend(data)
+      // Fetch the bank-specific receipt link and parse the result
+      return await this.fetchBankTransaction(data, config)
     } catch (error) {
       console.error("Verification error:", error)
       return {
@@ -106,30 +101,52 @@ export class VerificationService {
     }
   }
 
-  private async verifyTelebirrTransaction(data: VerificationData): Promise<VerificationResult> {
-    try {
-      const response = await fetch(
-        `https://transactioninfo.ethiotelecom.et/receipt/${data.invoiceNumber}`,
-        {
-          method: "GET",
-          headers: {
-            "User-Agent": "FinanceApp/1.0",
-            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          },
-        }
-      )
+  /** Build the bank-specific receipt URL for a given invoice number. */
+  getReceiptUrl(bank: string, invoiceNumber: string): string {
+    const config = BANK_CONFIGS[bank]
+    if (!config) return ""
+    const normalized = invoiceNumber.toUpperCase()
+    // Some bank URLs append a trailing slash, others don't
+    const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`
+    return `${base}${normalized}`
+  }
 
-      if (response.ok) {
-        const html = await response.text()
-        return this.parseTelebirrResponse(html, data.invoiceNumber)
-      } else {
+  private async fetchBankTransaction(
+    data: VerificationData,
+    config: BankConfig
+  ): Promise<VerificationResult> {
+    const url = this.getReceiptUrl(data.bank, data.invoiceNumber)
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        // Credentials must be omitted for cross-origin bank endpoints
+        cache: "no-store",
+        headers: {
+          "User-Agent": "FinanceApp/1.0",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8,application/json",
+        },
+      })
+
+      if (!response.ok) {
         return {
           isValid: false,
           error: "Transaction not found or invalid",
         }
       }
+
+      const contentType = response.headers.get("content-type") || ""
+      let body: string
+
+      if (contentType.includes("application/json")) {
+        const json = await response.json()
+        return this.parseJsonResponse(json, data, config)
+      } else {
+        body = await response.text()
+        return this.parseHtmlResponse(body, data, config)
+      }
     } catch (error) {
-      console.error("Telebirr verification error:", error)
+      console.error(`${config.name} verification error:`, error)
       return {
         isValid: false,
         error: "Network error or service unavailable",
@@ -137,47 +154,68 @@ export class VerificationService {
     }
   }
 
-  private async verifyViaBackend(data: VerificationData): Promise<VerificationResult> {
-    // Implement your backend API call here
-    // This is where you'd integrate with your existing payment records system
-    try {
-      const response = await fetch("/api/v1/verification/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
+  private parseJsonResponse(
+    json: unknown,
+    data: VerificationData,
+    config: BankConfig
+  ): VerificationResult {
+    const record = (json && typeof json === "object" ? json : {}) as Record<string, unknown>
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+    // Accept common shapes: { isValid/isValidated/status } or { data: {...} }
+    const status = String(record.status ?? record.transactionStatus ?? "").toLowerCase()
+    const isValid =
+      record.isValid === true ||
+      record.isValidated === true ||
+      status === "completed" ||
+      status === "confirmed" ||
+      status === "success"
 
-      return await response.json()
-    } catch (error) {
+    if (isValid) {
       return {
-        isValid: false,
-        error: "Backend verification service unavailable",
+        isValid: true,
+        transactionDetails: {
+          transactionId:
+            String(record.transactionId ?? record.referenceId ?? data.invoiceNumber),
+          amount: String(record.amount ?? record.amountPaid ?? data.amount ?? "N/A"),
+          date: String(record.date ?? record.transactionDate ?? "N/A"),
+          recipient: String(record.recipient ?? record.recipientPhone ?? data.recipientPhone ?? "N/A"),
+          status: "Completed",
+          bank: config.name,
+        },
       }
+    }
+
+    return {
+      isValid: false,
+      error: record.message ? String(record.message) : "Transaction not found",
     }
   }
 
-  private parseTelebirrResponse(html: string, invoiceNumber: string): VerificationResult {
+  private parseHtmlResponse(
+    html: string,
+    data: VerificationData,
+    config: BankConfig
+  ): VerificationResult {
     try {
-      // Parse the HTML response to extract transaction details
-      // This is a simplified parser - you'd need more robust HTML parsing
-      const isValid = html.includes("Transaction Details") || html.includes("Receipt")
+      // Basic HTML scan for transaction/receipt markers
+      const isValid =
+        html.includes("Transaction Details") ||
+        html.includes("Receipt") ||
+        html.includes("transaction details") ||
+        html.includes("Transaction Successful") ||
+        html.includes("payment successful")
 
       if (isValid) {
         return {
           isValid: true,
           transactionDetails: {
-            transactionId: invoiceNumber,
-            amount: this.extractAmount(html),
-            date: this.extractDate(html),
-            recipient: this.extractRecipient(html),
+            transactionId:
+              this.extractTransactionId(html) || data.invoiceNumber,
+            amount: this.extractAmount(html) || data.amount || "N/A",
+            date: this.extractDate(html) || "N/A",
+            recipient: this.extractRecipient(html) || data.recipientPhone || "N/A",
             status: "Completed",
-            bank: "Telebirr",
+            bank: config.name,
           },
         }
       }
@@ -192,6 +230,13 @@ export class VerificationService {
         error: "Failed to parse transaction details",
       }
     }
+  }
+
+  private extractTransactionId(html: string): string {
+    const match =
+      html.match(/Transaction(?:\s+ID)?[:\s]*([A-Z0-9_-]+)/i) ||
+      html.match(/Receipt(?:\s+No\.?| Number)?[:\s]*([A-Z0-9_-]+)/i)
+    return match ? match[1] : ""
   }
 
   private extractAmount(html: string): string {

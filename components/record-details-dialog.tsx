@@ -194,13 +194,13 @@ export function RecordDetailsDialog({
 
   const nextSlip = () => {
     if (record && record.paymentRecordLine && record.paymentRecordLine.length > 0) {
-      setCurrentSlipIndex((prev) => (prev + 1) % record.paymentRecordLine.length)
+      setCurrentSlipIndex((prev) => (prev + 1) % record.paymentRecordLine!.length)
     }
   }
 
   const prevSlip = () => {
     if (record && record.paymentRecordLine && record.paymentRecordLine.length > 0) {
-      setCurrentSlipIndex((prev) => (prev - 1 + record.paymentRecordLine.length) % record.paymentRecordLine.length)
+      setCurrentSlipIndex((prev) => (prev - 1 + record.paymentRecordLine!.length) % record.paymentRecordLine!.length)
     }
   }
 
@@ -213,7 +213,7 @@ export function RecordDetailsDialog({
 
   // Update the handleSelectAllSlips function
   const handleSelectAllSlips = (checked: boolean) => {
-    const newSelectedSlips = {}
+    const newSelectedSlips: Record<number, boolean> = {}
     if (record && record.paymentRecordLine) {
       record.paymentRecordLine.forEach((slip, index) => {
         // Since we don't have status in the actual data, we'll assume all slips are selectable
@@ -239,7 +239,7 @@ export function RecordDetailsDialog({
     }
 
     // Convert indices to payment record line data for the API
-    const linesToConfirm = selectedIndices.map((index) => record.paymentRecordLine[index])
+    const linesToConfirm = selectedIndices.map((index) => record.paymentRecordLine?.[index])
 
     setIsSubmitting(true)
     try {
@@ -299,7 +299,7 @@ export function RecordDetailsDialog({
     }
 
     // Convert indices to slip data for the API
-    const slipsToDeny = selectedIndices.map((index) => record.paymentRecordLine[index])
+    const slipsToDeny = selectedIndices.map((index) => record.paymentRecordLine?.[index])
 
     setIsSubmitting(true)
     try {
@@ -410,7 +410,7 @@ export function RecordDetailsDialog({
                 <Badge
                   variant={
                     record.confirmationStatus?.toLowerCase() === "completed"
-                      ? "success"
+                      ? ("success" as "secondary")
                       : record.confirmationStatus?.toLowerCase() === "requested"
                         ? "outline"
                         : record.confirmationStatus?.toLowerCase() === "duplicate"
@@ -476,7 +476,7 @@ export function RecordDetailsDialog({
                 <div className="mb-4">
                   <h3 className="text-sm font-medium mb-2">Select slip to view:</h3>
                   <div className="flex gap-2 overflow-x-auto pb-2">
-                    {record.paymentRecordLine.map((line, index) => (
+                    {record.paymentRecordLine?.map((line, index) => (
                       <Button
                         key={index}
                         variant={index === currentSlipIndex ? "default" : "outline"}
@@ -503,7 +503,7 @@ export function RecordDetailsDialog({
                             onCheckedChange={(checked) => handleSlipSelectionChange(currentSlipIndex, !!checked)}
                           />
                           <Badge variant="outline">
-                            {record.paymentRecordLine[currentSlipIndex].status || "REQUESTED"}
+                            {record.paymentRecordLine![currentSlipIndex].status || "REQUESTED"}
                           </Badge>
                         </div>
                       </CardTitle>
@@ -523,37 +523,37 @@ export function RecordDetailsDialog({
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Reference ID</h3>
-                          <p>{record.paymentRecordLine[currentSlipIndex].referenceId}</p>
+                          <p>{record.paymentRecordLine![currentSlipIndex].referenceId}</p>
                         </div>
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Transaction Date</h3>
                           <p className="flex items-center gap-1">
                             <Calendar className="h-3.5 w-3.5" />
-                            {record.paymentRecordLine[currentSlipIndex].createdDate
-                              ? formatDate(record.paymentRecordLine[currentSlipIndex].createdDate)
+                            {record.paymentRecordLine![currentSlipIndex].createdDate
+                              ? formatDate(record.paymentRecordLine![currentSlipIndex].createdDate)
                               : formatDate(record.createdDate || new Date())}
                           </p>
                         </div>
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Dr. Account Name</h3>
-                          <p>{record.paymentRecordLine[currentSlipIndex].debitAccountName}</p>
+                          <p>{record.paymentRecordLine![currentSlipIndex].debitAccountName}</p>
                         </div>
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Dr. Account Number</h3>
-                          <p>{record.paymentRecordLine[currentSlipIndex].debitAccountNo}</p>
+                          <p>{record.paymentRecordLine![currentSlipIndex].debitAccountNo}</p>
                         </div>
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Cr. Account Name</h3>
-                          <p>{record.paymentRecordLine[currentSlipIndex].creditAccountName}</p>
+                          <p>{record.paymentRecordLine![currentSlipIndex].creditAccountName}</p>
                         </div>
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Cr. Account Number</h3>
-                          <p>{record.paymentRecordLine[currentSlipIndex].creditAccountNo}</p>
+                          <p>{record.paymentRecordLine![currentSlipIndex].creditAccountNo}</p>
                         </div>
                         <div>
                           <h3 className="font-medium text-muted-foreground text-sm">Amount</h3>
                           <p className="font-semibold">
-                            Br. {record.paymentRecordLine[currentSlipIndex].amountPaid.toFixed(2)}
+                            Br. {record.paymentRecordLine![currentSlipIndex].amountPaid.toFixed(2)}
                           </p>
                         </div>
                         <div>
@@ -638,7 +638,7 @@ export function RecordDetailsDialog({
                 <div className="mb-4">
                   <h3 className="text-sm font-medium mb-2">Viewing images for slip:</h3>
                   <div className="flex gap-2 overflow-x-auto pb-2">
-                    {record.paymentRecordLine.map((line, index) => (
+                    {record.paymentRecordLine?.map((line, index) => (
                       <Button
                         key={index}
                         variant={index === currentSlipIndex ? "default" : "outline"}

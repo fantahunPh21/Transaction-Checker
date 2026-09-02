@@ -17,13 +17,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast"
 import { RecordDetailsDialog } from "@/components/record-details-dialog"
 import { usePaymentRecords } from "@/hooks/use-payment-records"
+import type { PaymentRecord } from "@/lib/types"
 
 export function PaymentRecordsTable() {
   const { toast } = useToast()
   const router = useRouter()
-  const [selectedRecord, setSelectedRecord] = useState(null)
+  const [selectedRecord, setSelectedRecord] = useState<PaymentRecord | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [confirmingId, setConfirmingId] = useState(null)
+  const [confirmingId, setConfirmingId] = useState<number | null>(null)
 
   const { records, isLoading, error, pagination, goToPage, changePageSize, refreshRecords } = usePaymentRecords()
 
@@ -35,7 +36,7 @@ export function PaymentRecordsTable() {
     return <div className="flex justify-center p-4 text-red-500">Error loading payment records: {error}</div>
   }
 
-  const handleViewDetails = (record) => {
+  const handleViewDetails = (record: PaymentRecord) => {
     setSelectedRecord(record)
     setDetailsOpen(true)
     toast({
@@ -44,7 +45,7 @@ export function PaymentRecordsTable() {
     })
   }
 
-  const handleConfirmPayment = async (paymentRecordsId) => {
+  const handleConfirmPayment = async (paymentRecordsId: number) => {
     try {
       setConfirmingId(paymentRecordsId)
       toast({
@@ -76,7 +77,7 @@ export function PaymentRecordsTable() {
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to confirm payment",
+        description: error instanceof Error ? error.message : "Failed to confirm payment",
         variant: "destructive",
       })
     } finally {
@@ -134,22 +135,22 @@ export function PaymentRecordsTable() {
                   <TableCell>{record.debitAccountNo}</TableCell>
                   <TableCell>{record.creditAccountNo}</TableCell>
                   <TableCell>{record.referenceId}</TableCell>
-                  <TableCell>Br.{Number.parseFloat(record.amountPaid).toFixed(2)}</TableCell>
+                  <TableCell>Br.{Number(record.amountPaid).toFixed(2)}</TableCell>
                   <TableCell>{new Date("04.07.2025").toLocaleDateString("en-CA")}</TableCell>
                   <TableCell>{record.salesPerson}</TableCell>
                   <TableCell>
                     <div
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        record.requestStatus.toLowerCase() === "completed"
+                        record.requestStatus?.toLowerCase() === "completed"
                           ? "bg-green-100 text-green-800"
-                          : record.requestStatus.toLowerCase() === "requested"
+                          : record.requestStatus?.toLowerCase() === "requested"
                             ? "bg-yellow-100 text-yellow-800"
-                            : record.requestStatus.toLowerCase() == "duplicate"
+                            : record.requestStatus?.toLowerCase() == "duplicate"
                               ? "bg-red-100 text-yellow-800"
                               : "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {record.requestStatus.toUpperCase()}
+                      {record.requestStatus?.toUpperCase()}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -252,7 +253,7 @@ export function PaymentRecordsTable() {
           open={detailsOpen}
           onOpenChange={setDetailsOpen}
           onConfirm={() => {
-            handleConfirmPayment(selectedRecord.id)
+            handleConfirmPayment(selectedRecord.paymentRecordsId)
             setDetailsOpen(false)
           }}
         />

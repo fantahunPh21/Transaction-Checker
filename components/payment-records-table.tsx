@@ -11,20 +11,21 @@ import { AddTransactionModal } from "@/components/add-transaction-modal"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import api from "@/lib/api"
+import type { PaymentRecord } from "@/lib/types"
 
 export function PaymentRecordsTable() {
   const { toast } = useToast()
-  const [selectedRecord, setSelectedRecord] = useState(null)
+  const [selectedRecord, setSelectedRecord] = useState<PaymentRecord | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [confirmingId, setConfirmingId] = useState(null)
+  const [confirmingId, setConfirmingId] = useState<number | null>(null)
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [recordToEdit, setRecordToEdit] = useState(null)
+  const [recordToEdit, setRecordToEdit] = useState<PaymentRecord | null>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
 
   // Use the custom hook with pagination
   const { records, isLoading, error, pagination, goToPage, changePageSize, refreshRecords } = usePaymentRecords()
 
-  const handleViewDetails = (record) => {
+  const handleViewDetails = (record: PaymentRecord) => {
     setSelectedRecord(record)
     setDetailsOpen(true)
     toast({
@@ -33,7 +34,7 @@ export function PaymentRecordsTable() {
     })
   }
 
-  const handleEditRecord = (record) => {
+  const handleEditRecord = (record: PaymentRecord) => {
     setRecordToEdit(record)
     setEditModalOpen(true)
     toast({
@@ -42,7 +43,7 @@ export function PaymentRecordsTable() {
     })
   }
 
-  const handleConfirmPayment = async (paymentRecordsId) => {
+  const handleConfirmPayment = async (paymentRecordsId: number) => {
     try {
       setConfirmingId(paymentRecordsId)
       toast({
@@ -51,7 +52,7 @@ export function PaymentRecordsTable() {
       })
 
       // Use the centralized API client
-      await api.put(`payment-records/${paymentRecordsId}/confirm`)
+      await api.put(`payment-records/${paymentRecordsId}/confirm`, {})
 
       toast({
         title: "Success",
@@ -64,7 +65,7 @@ export function PaymentRecordsTable() {
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to confirm payment",
+        description: error instanceof Error ? error.message : "Failed to confirm payment",
         variant: "destructive",
       })
     } finally {
@@ -137,7 +138,7 @@ export function PaymentRecordsTable() {
                   <TableCell>{paymentLine.debitAccountNo || "-"}</TableCell>
                   <TableCell>{paymentLine.creditAccountNo || "-"}</TableCell>
                   <TableCell>{paymentLine.referenceId || "-"}</TableCell>
-                  <TableCell>Br.{Number.parseFloat(record.amountPaid).toFixed(2)}</TableCell>
+                  <TableCell>Br.{Number(record.amountPaid).toFixed(2)}</TableCell>
                   <TableCell>{new Date(record.createdDate || "04.07.2025").toLocaleDateString("en-CA")}</TableCell>
                   <TableCell>{record.salesPerson}</TableCell>
                   <TableCell>

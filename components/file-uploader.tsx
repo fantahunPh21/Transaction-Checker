@@ -13,6 +13,22 @@ interface MultipleFileUploaderProps {
   entityData: string
   uploadedImageNames?: string[] | null
 }
+
+interface UploadFileOptions {
+  endpoint: string
+  file: File
+  entityData?: string
+  uploadedImageNames?: string[]
+  token?: string
+}
+
+interface UploadMultipleFilesOptions {
+  endpoint: string
+  files: File[]
+  entityData?: string[]
+  uploadedImageNames?: string[]
+}
+
 /**
  * FileUploader component for handling file uploads
  */
@@ -22,7 +38,7 @@ const FileUploader = {
    * @param options - Upload options including endpoint, file, and entity data
    * @returns Promise that resolves to true if upload was successful, false otherwise
    */
-  uploadFile: async ({ endpoint, file, entityData = "", uploadedImageNames = [] }) => {
+  uploadFile: async ({ endpoint, file, entityData = "", uploadedImageNames = [], token: tokenOverride }: UploadFileOptions) => {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("entityData", entityData)
@@ -33,8 +49,8 @@ const FileUploader = {
     }
 
     try {
-      // Get token from localStorage
-      const token = localStorage.getItem("authToken")
+      // Get token from localStorage or use override
+      const token = tokenOverride || localStorage.getItem("authToken")
       if (!token) {
         console.error("Authentication token not found")
         return { status: false, content: "Authentication token not found" }
@@ -60,11 +76,11 @@ const FileUploader = {
       return { status: true, content: data.content }
     } catch (error) {
       console.error("File upload error:", error)
-      return { status: false, content: error.message || "File upload failed" }
+      return { status: false, content: error instanceof Error ? error.message : "File upload failed" }
     }
   },
 
-  uploadMultipleFiles: async ({ endpoint, files, entityData = [], uploadedImageNames = [] }) => {
+  uploadMultipleFiles: async ({ endpoint, files, entityData = [], uploadedImageNames = [] }: UploadMultipleFilesOptions) => {
     const uploadedNames = []
 
     for (let i = 0; i < files.length; i++) {

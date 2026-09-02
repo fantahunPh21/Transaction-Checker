@@ -7,26 +7,32 @@ import { useToast } from "@/hooks/use-toast"
 import { isAdmin, hasRole } from "@/lib/auth"
 
 interface User {
-  id: number
+  id?: number
+  userId?: number
   firstName: string
   lastName: string
-  email: string
-  phone: string
-  photo: string
-  role: {
+  email?: string
+  phone?: string
+  userName?: string
+  photo?: string
+  role?: {
     id: number
     name: string
   }
-  company: {
+  company?: {
     id: number
     name: string
   }
-  shops: Array<{
+  shopBranches?: Array<{
+    shopBranchId?: number
+    shopBranchName: string
+  }>
+  shops?: Array<{
     id: number
     name: string
   }>
-  createdAt: string
-  updatedAt: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export function usersRecord() {

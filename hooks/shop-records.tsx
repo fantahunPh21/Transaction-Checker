@@ -4,11 +4,12 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
+import type { ShopBranch } from "@/lib/types"
 
 export function shopsRecord() {
-  const [shops, setShops] = useState([])
+  const [shops, setShops] = useState<ShopBranch[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
   const [totalItems, setTotalItems] = useState(0) // Total items for pagination
   const [currentPage, setCurrentPage] = useState(0) // Track current page

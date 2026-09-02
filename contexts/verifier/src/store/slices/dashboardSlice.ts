@@ -1,5 +1,30 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
 
+interface RecentTransaction {
+  id: string
+  bank: string
+  invoiceNumber: string
+  amount: string
+  date: string
+  status: "valid" | "invalid"
+}
+
+interface DashboardStats {
+  totalVerifications: number
+  successRate: number
+  validTransactions: number
+  invalidTransactions: number
+  monthlyVerifications: number[]
+  recentTransactions: RecentTransaction[]
+}
+
+interface DashboardState {
+  stats: DashboardStats | null
+  recentTransactions: RecentTransaction[]
+  isLoading: boolean
+  error: string | null
+}
+
 export const fetchDashboardData = createAsyncThunk("dashboard/fetchData", async () => {
   // Simulate API call
   await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -34,10 +59,10 @@ export const fetchDashboardData = createAsyncThunk("dashboard/fetchData", async 
 const dashboardSlice = createSlice({
   name: "dashboard",
   initialState: {
-    stats: null,
-    recentTransactions: [],
+    stats: null as DashboardStats | null,
+    recentTransactions: [] as RecentTransaction[],
     isLoading: false,
-    error: null,
+    error: null as string | null,
   },
   reducers: {},
   extraReducers: (builder) => {

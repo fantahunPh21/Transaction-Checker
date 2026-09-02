@@ -5,7 +5,7 @@ import { cookies } from "next/headers"
 export async function GET(request: Request) {
   try {
     // Get the auth token from cookies (server-side)
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const authToken = cookieStore.get("authToken")?.value
 
     // Get token from Authorization header if it exists in the incoming request
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     // Get the auth token from cookies (server-side)
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const authToken = cookieStore.get("authToken")?.value
 
     // Get token from Authorization header if it exists in the incoming request

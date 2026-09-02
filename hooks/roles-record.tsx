@@ -7,8 +7,10 @@ import { useToast } from "@/hooks/use-toast"
 import { isAdmin, hasRole } from "@/lib/auth"
 
 interface Role {
-  roleId: number
-  roleName: string
+  roleId?: number
+  roleName?: string
+  id?: number
+  name?: string
   description: string
   createdAt: string
   updatedAt: string

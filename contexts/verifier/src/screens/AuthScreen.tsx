@@ -93,7 +93,7 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Full Name"
                   value={formData.name}
-                  onChangeText={(value) => updateFormData("name", value)}
+                  onChangeText={(value: string) => updateFormData("name", value)}
                   autoCapitalize="words"
                 />
               </View>
@@ -105,7 +105,7 @@ export default function AuthScreen() {
                 style={styles.input}
                 placeholder="Email Address"
                 value={formData.email}
-                onChangeText={(value) => updateFormData("email", value)}
+                onChangeText={(value: string) => updateFormData("email", value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -118,7 +118,7 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Phone Number"
                   value={formData.phone}
-                  onChangeText={(value) => updateFormData("phone", value)}
+                  onChangeText={(value: string) => updateFormData("phone", value)}
                   keyboardType="phone-pad"
                 />
               </View>
@@ -130,7 +130,7 @@ export default function AuthScreen() {
                 style={styles.input}
                 placeholder="Password"
                 value={formData.password}
-                onChangeText={(value) => updateFormData("password", value)}
+                onChangeText={(value: string) => updateFormData("password", value)}
                 secureTextEntry
               />
             </View>

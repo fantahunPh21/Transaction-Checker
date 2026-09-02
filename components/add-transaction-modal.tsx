@@ -83,12 +83,12 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
   const [selectedHolderNames, setSelectedHolderNames] = useState<Record<number, string>>({})
   const { companies, isLoading } = companiesRecord()
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState(null)
-  const [accounts, setBankAccounts] = useState([])
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
+  const [accounts, setBankAccounts] = useState<{value: string; label: string; accountHolder: string}[]>([])
   const [loadingBanks, setLoadingBanks] = useState(false)
   const { shops, isLoading: isShopLoading, setShops } = shopsRecord()
 
-  const [suggestions, setSuggestions] = useState([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedCustomerName, setSelectedCustomerName] = useState("")
   const [selectedCustomerTin, setSelectedCustomerTin] = useState("")
@@ -135,7 +135,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
 
   // Initialize the form with default values
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       companyName: "",
       customerTIN: "",
@@ -160,11 +160,11 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
   })
 
   // When a suggestion is clicked, update both fields
-  const handleSuggestionClick = (tin) => {
+  const handleSuggestionClick = (tin: string) => {
     form.setValue("customerTIN", tin)
-    form.setValue("customerName", customers[tin])
+    form.setValue("customerName", customers[tin as keyof typeof customers])
     setSelectedCustomerTin(tin)
-    setSelectedCustomerName(customers[tin])
+    setSelectedCustomerName(customers[tin as keyof typeof customers])
     setShowSuggestions(false)
   }
 
@@ -203,7 +203,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
       console.log("Setting shop ID:", shopId)
 
       // Handle payment record lines if available
-      let paymentLines = []
+      let paymentLines: any[] = []
 
       // Try different field names that might contain the payment lines
       if (record.paymentRecordLine && record.paymentRecordLine.length > 0) {
@@ -219,7 +219,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
 
       if (paymentLines.length > 0) {
         // Map the payment lines to the form structure
-        const formattedSlips = paymentLines.map((line) => {
+        const formattedSlips = paymentLines.map((line: any) => {
           console.log("Processing line:", line)
           return {
             // Handle different field naming conventions with fallbacks
@@ -241,8 +241,8 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
         form.setValue("drAccount", formattedSlips)
 
         // Set selected holder names for credit accounts
-        const holderNames = {}
-        formattedSlips.forEach((slip, index) => {
+        const holderNames: Record<number, string> = {}
+        formattedSlips.forEach((slip: any, index: number) => {
           if (slip.crAccountName) {
             holderNames[index] = slip.crAccountName
           }
@@ -322,7 +322,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
         return response.json()
       })
       .then((data) => {
-        const formatted = (data.content.bankAccount || []).map((account) => ({
+        const formatted = (data.content.bankAccount || []).map((account: any) => ({
           value: account.accountNumber,
           label: `${account.accountNumber} - ${account.bankName}`,
           accountHolder: account.accountHolder,
@@ -415,7 +415,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
 
       // If editing, include the record ID
       if (props.isEditing && props.recordData) {
-        minimalPayload.paymentRecordsId = props.recordData.paymentRecordsId
+        ;(minimalPayload as Record<string, any>).paymentRecordsId = props.recordData.paymentRecordsId
       }
 
       // Use the API client for the request
@@ -538,7 +538,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
 
       // If editing, include the record ID
       if (props.isEditing && props.recordData) {
-        jsonData.paymentRecordsId = props.recordData.paymentRecordsId
+        ;(jsonData as Record<string, any>).paymentRecordsId = props.recordData.paymentRecordsId
       }
 
       console.log("Sending payload:", jsonData)
@@ -739,7 +739,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
                               onClick={() => handleSuggestionClick(tin)}
                               style={{ padding: "8px", cursor: "pointer" }}
                             >
-                              {tin} - {customers[tin]}
+                              {tin} - {customers[tin as keyof typeof customers]}
                             </div>
                           ))}
                         </div>
@@ -1032,9 +1032,9 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
                                   existing image(s). Upload new ones to replace.
                                 </p>
                                 {typeof originalRecord.paymentRecordLine[index].images === "string" &&
-                                  originalRecord.paymentRecordLine[index].images.split(",").map((img, imgIndex) => (
+                                  originalRecord.paymentRecordLine[index].images.split(",").map((img: string, imgIndex: number) => (
                                     <span key={imgIndex} className="text-xs text-blue-600 mr-2">
-                                      {img.split("/").pop()}
+                                      {(img as string).split("/").pop()}
                                     </span>
                                   ))}
                               </div>

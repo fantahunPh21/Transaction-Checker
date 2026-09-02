@@ -28,9 +28,22 @@ const formSchema = z.object({
   phoneNumber: z.string().min(1, "Phone number is required"),
 })
 
+interface EditUserModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  user: {
+    id?: string | number
+    firstName?: string
+    lastName?: string
+    email?: string
+    phone?: string
+    phoneNumber?: string
+  } | null
+}
+
 type FormValues = z.infer<typeof formSchema>
 
-export function EditUserModal({ open, onOpenChange, user }) {
+export function EditUserModal({ open, onOpenChange, user }: EditUserModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const { updateUser } = useUsersManagement()
@@ -52,7 +65,7 @@ export function EditUserModal({ open, onOpenChange, user }) {
     if (user) {
       console.log("User data for edit:", user)
       form.reset({
-        id: user.id || "",
+        id: (user.id || "") as string,
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.email || "",

@@ -53,7 +53,24 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-export function EditCompanyModal({ open, onOpenChange, company, onSubmit }) {
+interface EditCompanyModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  company: {
+    companyId: number
+    companyName?: string
+    companyEmail?: string
+    companyPhone?: string
+    TinNumber?: string
+    tin?: string
+    location?: string
+    logo?: string | null
+    bankAccount?: Array<{ id?: string; bankName?: string; accountNumber?: string; accountHolder?: string }>
+  } | null
+  onSubmit: (data: Record<string, unknown>) => void
+}
+
+export function EditCompanyModal({ open, onOpenChange, company, onSubmit }: EditCompanyModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
@@ -219,7 +236,7 @@ export function EditCompanyModal({ open, onOpenChange, company, onSubmit }) {
       console.error("Error submitting form:", error)
       toast({
         title: "ERROR",
-        description: error.message || "Failed to update company. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update company. Please try again.",
         variant: "destructive",
       })
     } finally {

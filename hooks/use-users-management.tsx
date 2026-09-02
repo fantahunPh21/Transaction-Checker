@@ -5,9 +5,9 @@ import { useToast } from "@/hooks/use-toast"
 import { api } from "@/lib/api"
 
 export function useUsersManagement() {
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const { toast } = useToast()
 
@@ -23,7 +23,7 @@ export function useUsersManagement() {
       }
     } catch (err) {
       console.error("Error fetching users:", err)
-      setError(err.message)
+      setError(err instanceof Error ? err.message : "Failed to load users")
       toast({
         title: "Error",
         description: "Failed to load users",
@@ -42,7 +42,7 @@ export function useUsersManagement() {
     fetchUsers(searchQuery)
   }
 
-  const createUser = async (userData) => {
+  const createUser = async (userData: any) => {
     try {
       const response = await api.post("/api/v1/users", userData)
 
@@ -58,7 +58,7 @@ export function useUsersManagement() {
     }
   }
 
-  const updateUser = async (userData) => {
+  const updateUser = async (userData: any) => {
     try {
       const response = await api.put("/api/v1/users", userData)
 
@@ -74,9 +74,9 @@ export function useUsersManagement() {
     }
   }
 
-  const deleteUser = async (userId) => {
+  const deleteUser = async (userId: any) => {
     try {
-      const response = await api.delete(`/api/v1/users/${userId}`)
+      const response = await api.del(`/api/v1/users/${userId}`)
 
       if (response.status === 200) {
         await fetchUsers(searchQuery) // Refresh the list
@@ -90,9 +90,9 @@ export function useUsersManagement() {
     }
   }
 
-  const assignRole = async (userId, roleId) => {
+  const assignRole = async (userId: any, roleId: any) => {
     try {
-      const response = await api.put(`/api/v1/users/${userId}/role/${roleId}`)
+      const response = await api.put(`/api/v1/users/${userId}/role/${roleId}`, {})
 
       if (response.status === 200) {
         await fetchUsers(searchQuery) // Refresh the list
@@ -106,9 +106,9 @@ export function useUsersManagement() {
     }
   }
 
-  const removeRole = async (userId) => {
+  const removeRole = async (userId: any) => {
     try {
-      const response = await api.delete(`/api/v1/users/${userId}/role`)
+      const response = await api.del(`/api/v1/users/${userId}/role`)
 
       if (response.status === 200) {
         await fetchUsers(searchQuery) // Refresh the list
@@ -122,7 +122,7 @@ export function useUsersManagement() {
     }
   }
 
-  const getUserById = async (userId) => {
+  const getUserById = async (userId: any) => {
     try {
       const response = await api.get(`/api/v1/users/${userId}`)
 

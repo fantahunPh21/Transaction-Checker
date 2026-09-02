@@ -28,9 +28,25 @@ const formSchema = z.object({
   shopIds: z.array(z.string()).min(1, "At least one shop must be selected"),
 })
 
+interface EditSalesmanModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  salesman: {
+    id?: string | number
+    salesmanId?: string | number
+    firstName?: string
+    lastName?: string
+    phoneNumber?: string
+    phone?: string
+    shops?: Array<{ id?: string | number; shopBranchId?: string | number; name?: string; shopBranchName?: string }>
+  } | null
+  onSubmit: (data: Record<string, unknown>) => Promise<void>
+  shops: Array<{ id?: string | number; shopBranchId?: string | number; name?: string; shopBranchName?: string }>
+}
+
 type FormValues = z.infer<typeof formSchema>
 
-export function EditSalesmanModal({ open, onOpenChange, salesman, onSubmit, shops }) {
+export function EditSalesmanModal({ open, onOpenChange, salesman, onSubmit, shops }: EditSalesmanModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
@@ -57,11 +73,11 @@ export function EditSalesmanModal({ open, onOpenChange, salesman, onSubmit, shop
         : []
 
       form.reset({
-        id: salesman.id || salesman.salesmanId || "",
+        id: (salesman.id || salesman.salesmanId || "") as string,
         firstName: salesman.firstName || "",
         lastName: salesman.lastName || "",
         phoneNumber: salesman.phoneNumber || salesman.phone || "",
-        shopIds: shopIds,
+        shopIds: shopIds as string[],
       })
     }
   }, [salesman, form])
@@ -72,7 +88,9 @@ export function EditSalesmanModal({ open, onOpenChange, salesman, onSubmit, shop
       console.log("Submitting salesman data:", data)
 
       // Map selected shop IDs to shop objects
-      const selectedShops = shops.filter((shop) => data.shopIds.includes(shop.id || shop.shopBranchId))
+      const selectedShops = shops.filter((shop) =>
+        data.shopIds.includes(String(shop.id ?? shop.shopBranchId)),
+      )
 
       const updatedSalesman = {
         id: data.id,
@@ -175,15 +193,15 @@ export function EditSalesmanModal({ open, onOpenChange, salesman, onSubmit, shop
                         control={form.control}
                         name="shopIds"
                         render={({ field }) => {
-                          const shopId = shop.id || shop.shopBranchId
+                          const shopId = (shop.id || shop.shopBranchId) as string | undefined
                           return (
                             <FormItem key={shopId} className="flex flex-row items-start space-x-3 space-y-0">
                               <FormControl>
                                 <Checkbox
-                                  checked={field.value?.includes(shopId)}
+                                  checked={field.value?.includes(shopId as string)}
                                   onCheckedChange={(checked) => {
                                     return checked
-                                      ? field.onChange([...field.value, shopId])
+                                      ? field.onChange([...(field.value ?? []), shopId])
                                       : field.onChange(field.value?.filter((value) => value !== shopId))
                                   }}
                                 />

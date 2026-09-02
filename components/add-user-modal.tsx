@@ -32,9 +32,14 @@ const formSchema = z.object({
   roleId: z.string().min(1, "User role is required"),
 })
 
+interface AddUserModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
 type FormValues = z.infer<typeof formSchema>
 
-export function AddUserModal({ open, onOpenChange }) {
+export function AddUserModal({ open, onOpenChange }: AddUserModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const { toast } = useToast()
@@ -205,7 +210,9 @@ export function AddUserModal({ open, onOpenChange }) {
                       ) : (
                         roles.map((role) => (
                           <SelectItem key={role.roleId} value={String(role.roleId)}>
-                            {role.roleName.charAt(0).toUpperCase() + role.roleName.slice(1).toLowerCase()}
+                            {(role.roleName ?? "")
+                              .charAt(0)
+                              .toUpperCase() + (role.roleName ?? "").slice(1).toLowerCase()}
                           </SelectItem>
                         ))
                       )}

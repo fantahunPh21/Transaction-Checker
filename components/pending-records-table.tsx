@@ -18,15 +18,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import api from "@/lib/api"
+import type { PaymentRecord } from "@/lib/types"
 
 export function PendingRecordsTable() {
   const { toast } = useToast()
   const router = useRouter()
-  const [selectedRecord, setSelectedRecord] = useState(null)
+  const [selectedRecord, setSelectedRecord] = useState<PaymentRecord | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [confirmingId, setConfirmingId] = useState(null)
+  const [confirmingId, setConfirmingId] = useState<number | null>(null)
 
-  const { pendingRecords, isLoading, error, pagination, goToPage, changePageSize, refreshRecords } = usePendingRecords()
+  const { pendingRecords, isLoading, error } = usePendingRecords()
 
   if (isLoading) {
     return <div className="flex justify-center p-4">Loading pending records...</div>
@@ -36,7 +37,7 @@ export function PendingRecordsTable() {
     return <div className="flex justify-center p-4 text-red-500">Error loading pending records: {error}</div>
   }
 
-  const handleViewDetails = (record) => {
+  const handleViewDetails = (record: PaymentRecord) => {
     setSelectedRecord(record)
     setDetailsOpen(true)
     toast({
@@ -45,7 +46,7 @@ export function PendingRecordsTable() {
     })
   }
 
-  const handleConfirmPayment = async (paymentRecordsId) => {
+  const handleConfirmPayment = async (paymentRecordsId: number) => {
     try {
       setConfirmingId(paymentRecordsId)
       toast({
@@ -54,7 +55,7 @@ export function PendingRecordsTable() {
       })
 
       // Use the centralized API client
-      await api.put(`payment-records/${paymentRecordsId}/confirm`)
+      await api.put(`payment-records/${paymentRecordsId}/confirm`, {})
 
       toast({
         title: "Success",
@@ -62,16 +63,12 @@ export function PendingRecordsTable() {
         variant: "default",
       })
 
-      if (refreshRecords) {
-        refreshRecords()
-      } else {
-        const event = new CustomEvent("refreshData")
-        window.dispatchEvent(event)
-      }
+      const event = new CustomEvent("refreshData")
+      window.dispatchEvent(event)
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to confirm payment",
+        description: error instanceof Error ? error.message : "Failed to confirm payment",
         variant: "destructive",
       })
     } finally {
@@ -82,7 +79,7 @@ export function PendingRecordsTable() {
   // Fix for the length error - ensure pendingRecords is an array before checking length
   const hasRecords = Array.isArray(pendingRecords) && pendingRecords.length > 0
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     try {
       // Try to parse the date string
       const date = new Date(dateString)
@@ -147,7 +144,7 @@ export function PendingRecordsTable() {
                   <TableCell>{record.debitAccountNo}</TableCell>
                   <TableCell>{record.creditAccountNo}</TableCell>
                   <TableCell>{record.referenceId}</TableCell>
-                  <TableCell>Br.{Number.parseFloat(record.amountPaid).toFixed(2)}</TableCell>
+                  <TableCell>Br.{Number(record.amountPaid).toFixed(2)}</TableCell>
                   <TableCell>{record.transactionDate ? formatDate(record.transactionDate) : "-"}</TableCell>
                   <TableCell>{record.salesPerson}</TableCell>
                   <TableCell>
@@ -207,57 +204,13 @@ export function PendingRecordsTable() {
         </Table>
       </div>
 
-      {pagination && (
-        <div className="flex items-center justify-between space-x-2 py-4">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm text-muted-foreground">
-              Showing <span className="font-medium">{pendingRecords?.length || 0}</span> of{" "}
-              <span className="font-medium">{pagination.totalElements || 0}</span> records
-            </p>
-            <div className="flex items-center space-x-2">
-              <p className="text-sm text-muted-foreground">Rows per page</p>
-              <Select
-                value={pagination.pageSize?.toString() || "10"}
-                onValueChange={(value) => changePageSize && changePageSize(Number(value))}
-              >
-                <SelectTrigger className="h-8 w-[70px]">
-                  <SelectValue placeholder={pagination.pageSize || 10} />
-                </SelectTrigger>
-                <SelectContent side="top">
-                  {[5, 10, 20, 50].map((size) => (
-                    <SelectItem key={size} value={size.toString()}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => goToPage && goToPage(pagination.currentPage - 1)}
-              disabled={pagination.currentPage === 0}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="sr-only">Previous Page</span>
-            </Button>
-            <div className="flex items-center justify-center text-sm font-medium">
-              Page {pagination.currentPage + 1} of {pagination.totalPages}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => goToPage && goToPage(pagination.currentPage + 1)}
-              disabled={pagination.currentPage === pagination.totalPages - 1}
-            >
-              <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Next Page</span>
-            </Button>
-          </div>
+      <div className="flex items-center justify-between space-x-2 py-4">
+        <div className="flex items-center space-x-2">
+          <p className="text-sm text-muted-foreground">
+            Showing <span className="font-medium">{pendingRecords?.length || 0}</span> pending records
+          </p>
         </div>
-      )}
+      </div>
 
       {selectedRecord && (
         <RecordDetailsDialog

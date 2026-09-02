@@ -21,12 +21,12 @@ import { BANK_CONFIGS } from "../constants/bankConfigs"
 import { BankSelector } from "../components/BankSelector"
 import { VerificationResult } from "../components/VerificationResult"
 import { LoadingOverlay } from "../components/LoadingOverlay"
-import type { RootState } from "../store" // Import RootState
+import type { RootState, AppDispatch } from "../store/store" // Import RootState
 import { parseQRData } from "../utils/qrUtils" // Import parseQRData
 import { useNavigation } from "@react-navigation/native"
 
 export default function VerificationScreen() {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const navigation = useNavigation() // Use useNavigation hook
   const { isLoading, result, error } = useSelector((state: RootState) => state.verification)
 
@@ -45,7 +45,7 @@ export default function VerificationScreen() {
       return false
     }
 
-    const config = BANK_CONFIGS[selectedBank]
+    const config = BANK_CONFIGS[selectedBank as keyof typeof BANK_CONFIGS]
     if (!config.pattern.test(invoiceNumber.toUpperCase())) {
       showError(`Invalid invoice number format for ${config.name}`)
       shakeInput()
@@ -104,7 +104,7 @@ export default function VerificationScreen() {
   const handleQRScan = () => {
     // Navigate to QR scanner
     navigation.navigate("QRScanner", {
-      onScanComplete: (data) => {
+      onScanComplete: (data: string) => {
         // Parse QR data and populate form
         const parsed = parseQRData(data)
         if (parsed) {
@@ -136,7 +136,7 @@ export default function VerificationScreen() {
                 style={styles.input}
                 value={invoiceNumber}
                 onChangeText={setInvoiceNumber}
-                placeholder={`Enter ${BANK_CONFIGS[selectedBank].name} invoice number`}
+                placeholder={`Enter ${BANK_CONFIGS[selectedBank as keyof typeof BANK_CONFIGS].name} invoice number`}
                 placeholderTextColor="#999"
                 autoCapitalize="characters"
               />
@@ -189,7 +189,7 @@ export default function VerificationScreen() {
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.primaryButton, { backgroundColor: BANK_CONFIGS[selectedBank].color }]}
+              style={[styles.button, styles.primaryButton, { backgroundColor: BANK_CONFIGS[selectedBank as keyof typeof BANK_CONFIGS].color }]}
               onPress={handleVerification}
               disabled={isLoading}
             >
@@ -211,7 +211,7 @@ export default function VerificationScreen() {
         </Animated.View>
 
         {/* Verification Result */}
-        {result && <VerificationResult result={result} bankConfig={BANK_CONFIGS[selectedBank]} />}
+        {result && <VerificationResult result={result} bankConfig={BANK_CONFIGS[selectedBank as keyof typeof BANK_CONFIGS]} />}
 
         {/* Loading Overlay */}
         {isLoading && <LoadingOverlay message="Verifying transaction..." />}

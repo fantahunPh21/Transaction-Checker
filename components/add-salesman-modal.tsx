@@ -31,9 +31,20 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-export function AddSalesmanModal({ open, onOpenChange, onSubmit }) {
+interface AddSalesmanModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (data: Record<string, unknown>) => void
+}
+
+interface ShopBranchItem {
+  shopId: number
+  shopBranchName: string
+}
+
+export function AddSalesmanModal({ open, onOpenChange, onSubmit }: AddSalesmanModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [shops, setShops] = useState([])
+  const [shops, setShops] = useState<ShopBranchItem[]>([])
   const { toast } = useToast()
 
   // Initialize the form with default values

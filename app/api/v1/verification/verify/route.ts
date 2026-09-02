@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verificationService } from "@/lib/verification"
 
-function getAuthToken(request: NextRequest): string | null {
-  const cookieStore = cookies()
+async function getAuthToken(request: NextRequest): Promise<string | null> {
+  const cookieStore = await cookies()
   const authCookie = cookieStore.get("authToken")?.value
 
   const incomingHeader = request.headers.get("Authorization")
@@ -14,7 +14,7 @@ function getAuthToken(request: NextRequest): string | null {
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
-    const token = getAuthToken(request)
+    const token = await getAuthToken(request)
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    const token = getAuthToken(request)
+    const token = await getAuthToken(request)
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

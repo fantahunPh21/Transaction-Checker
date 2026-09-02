@@ -18,6 +18,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import type { Company } from "@/lib/types"
+
+interface AddShopModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (data: Record<string, unknown>) => void
+}
 
 // Define the form schema with validation
 const formSchema = z.object({
@@ -30,9 +37,9 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-export function AddShopModal({ open, onOpenChange, onSubmit }) {
+export function AddShopModal({ open, onOpenChange, onSubmit }: AddShopModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [companies, setCompanies] = useState([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false)
   const { toast } = useToast()
 

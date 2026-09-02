@@ -18,7 +18,7 @@ export class BankAPIService {
     recipientPhone?: string
   }) {
     try {
-      const config = BANK_CONFIGS[data.bank]
+      const config = BANK_CONFIGS[data.bank as keyof typeof BANK_CONFIGS]
 
       // For Telebirr (real endpoint)
       if (data.bank === "telebirr") {

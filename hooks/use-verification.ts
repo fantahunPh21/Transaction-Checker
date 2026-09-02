@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import { verificationService, type VerificationData, type VerificationResult } from "@/lib/verification"
+import { type VerificationData, type VerificationResult, BANK_CONFIGS } from "@/lib/verification"
 import { useToast } from "@/hooks/use-toast"
+
+const VERIFY_ENDPOINT = "/api/v1/verification/verify"
 
 export function useVerification() {
   const [isLoading, setIsLoading] = useState(false)
@@ -16,42 +18,68 @@ export function useVerification() {
     setMounted(true)
   }, [])
 
-  const verifyTransaction = useCallback(async (data: VerificationData) => {
-    setIsLoading(true)
-    setError(null)
-    setResult(null)
+  const authHeaders = (): HeadersInit => {
+    if (typeof window === "undefined") return { "Content-Type": "application/json" }
+    const token = localStorage.getItem("authToken")
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }
+  }
 
-    try {
-      const result = await verificationService.verifyTransaction(data)
-      setResult(result)
+  const verifyTransaction = useCallback(
+    async (data: VerificationData): Promise<VerificationResult> => {
+      setIsLoading(true)
+      setError(null)
+      setResult(null)
 
-      if (result.isValid) {
-        toast({
-          title: "Verification Successful",
-          description: `Transaction ${result.transactionDetails?.transactionId} verified successfully`,
+      try {
+        const response = await fetch(VERIFY_ENDPOINT, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(data),
         })
-      } else {
+
+        const payload = await response.json()
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Verification failed")
+        }
+
+        setResult(payload)
+
+        if (payload.isValid) {
+          toast({
+            title: "Verification Successful",
+            description: `Transaction ${payload.transactionDetails?.transactionId} verified successfully`,
+          })
+        } else {
+          toast({
+            title: "Verification Failed",
+            description: payload.error || "Transaction could not be verified",
+            variant: "destructive",
+          })
+        }
+
+        return payload
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Verification failed"
+        setError(errorMessage)
         toast({
-          title: "Verification Failed",
-          description: result.error || "Transaction could not be verified",
+          title: "Verification Error",
+          description: errorMessage,
           variant: "destructive",
         })
+        return {
+          isValid: false,
+          error: errorMessage,
+        }
+      } finally {
+        setIsLoading(false)
       }
-
-      return result
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Verification failed"
-      setError(errorMessage)
-      toast({
-        title: "Verification Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      throw err
-    } finally {
-      setIsLoading(false)
-    }
-  }, [toast])
+    },
+    [toast],
+  )
 
   const clearResult = useCallback(() => {
     setResult(null)
@@ -59,15 +87,25 @@ export function useVerification() {
   }, [])
 
   const validateInvoiceNumber = useCallback((bank: string, invoiceNumber: string) => {
-    return verificationService.validateInvoiceNumber(bank, invoiceNumber)
+    const config = BANK_CONFIGS[bank]
+    if (!config) return false
+    return config.pattern.test(invoiceNumber.toUpperCase())
   }, [])
 
   const getBankConfig = useCallback((bank: string) => {
-    return verificationService.getBankConfig(bank)
+    return BANK_CONFIGS[bank]
   }, [])
 
   const getAllBanks = useCallback(() => {
-    return verificationService.getAllBanks()
+    return Object.values(BANK_CONFIGS)
+  }, [])
+
+  const getReceiptUrl = useCallback((bank: string, invoiceNumber: string) => {
+    const config = BANK_CONFIGS[bank]
+    if (!config) return ""
+    const normalized = invoiceNumber.toUpperCase()
+    const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`
+    return `${base}${normalized}`
   }, [])
 
   // Return safe values during SSR
@@ -76,11 +114,12 @@ export function useVerification() {
       isLoading: false,
       result: null,
       error: null,
-      verifyTransaction: async () => { throw new Error("Hook not mounted") },
+      verifyTransaction: async () => ({ isValid: false } as VerificationResult),
       clearResult: () => {},
       validateInvoiceNumber: () => false,
       getBankConfig: () => undefined,
       getAllBanks: () => [],
+      getReceiptUrl: () => "",
     }
   }
 
@@ -93,5 +132,6 @@ export function useVerification() {
     validateInvoiceNumber,
     getBankConfig,
     getAllBanks,
+    getReceiptUrl,
   }
 }

@@ -52,7 +52,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-export function AddCompanyModal({ open, onOpenChange, onSubmit }) {
+interface AddCompanyModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (data: Record<string, unknown>) => void
+}
+
+export function AddCompanyModal({ open, onOpenChange, onSubmit }: AddCompanyModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 

@@ -33,16 +33,33 @@ const formSchema = z.object({
   //companyId: z.string().min(1, "Company is required"),
 })
 
+interface EditShopModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  shop: {
+    shopBranchId?: number
+    shopBranchName?: string
+    shopBranchPhone?: string
+    address?: string
+    email?: string
+    phone?: string
+    companyId?: number
+    company?: { companyId?: number }
+    shopBranchCompany?: { companyId?: number }
+  } | null
+  onSubmit: (data: Record<string, unknown>) => void
+}
+
 type FormValues = z.infer<typeof formSchema>
 
-export function EditShopModal({ open, onOpenChange, shop, onSubmit }) {
+export function EditShopModal({ open, onOpenChange, shop, onSubmit }: EditShopModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const { companies, isLoading } = companiesRecord()
 
   // Initialize the form with company values
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       id: shop?.shopBranchId ?? 0,
       name: "",
@@ -97,13 +114,15 @@ export function EditShopModal({ open, onOpenChange, shop, onSubmit }) {
       } else {
         // If we can't find a company ID, log all properties of the shop object
         console.log("Could not find company ID. All shop properties:")
-        for (const key in shop) {
-          console.log(`${key}:`, shop[key])
+        const shopObj = shop as Record<string, unknown> | null
+        for (const key in shopObj) {
+          console.log(`${key}:`, shopObj[key])
         }
 
         // Try to find any property that might contain "company" in its name
-        const possibleCompanyProps = Object.keys(shop).filter(
-          (key) => key.toLowerCase().includes("company") || (typeof shop[key] === "object" && shop[key] !== null),
+        const possibleCompanyProps = Object.keys(shopObj ?? {}).filter(
+          (key) =>
+            key.toLowerCase().includes("company") || (typeof shopObj?.[key] === "object" && shopObj?.[key] !== null),
         )
 
         console.log("Possible company-related properties:", possibleCompanyProps)
@@ -114,7 +133,7 @@ export function EditShopModal({ open, onOpenChange, shop, onSubmit }) {
       }
 
       const jsonData = {
-        shopBranchId: Number(data.id) || shop.shopBranchId, // Ensure ID is not null
+        shopBranchId: Number(data.id) || shop?.shopBranchId, // Ensure ID is not null
         shopBranchName: data.name,
         email: data.email,
         shopBranchPhone: data.shopPhone || data.phone, // Use either field
@@ -156,7 +175,7 @@ export function EditShopModal({ open, onOpenChange, shop, onSubmit }) {
       console.error("Error in handleSubmit:", error)
       toast({
         title: "ERROR",
-        description: `Failed to update shop: ${error.message || "Please try again"}`,
+        description: `Failed to update shop: ${error instanceof Error ? error.message : "Please try again"}`,
         variant: "destructive",
       })
     } finally {

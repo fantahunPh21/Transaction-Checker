@@ -1,5 +1,14 @@
 import { createSlice } from "@reduxjs/toolkit"
 
+interface SettingsState {
+  notifications: boolean
+  biometric: boolean
+  autoVerify: boolean
+  saveHistory: boolean
+  darkMode: boolean
+  analytics: boolean
+}
+
 const settingsSlice = createSlice({
   name: "settings",
   initialState: {
@@ -12,7 +21,7 @@ const settingsSlice = createSlice({
   },
   reducers: {
     updateSetting: (state, action) => {
-      const { key, value } = action.payload
+      const { key, value } = action.payload as { key: keyof SettingsState; value: boolean }
       state[key] = value
     },
     resetSettings: (state) => {

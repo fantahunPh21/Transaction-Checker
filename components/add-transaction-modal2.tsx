@@ -63,7 +63,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
 
   // Initialize the form with default values
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       companyName: "",
       referenceId: "",
@@ -169,7 +169,7 @@ export function AddTransactionModal(props: AddTransactionModalProps) {
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to process transaction",
+        description: error instanceof Error ? error.message : "Failed to process transaction",
         variant: "destructive",
       })
     } finally {
